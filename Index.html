@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lyrics Pro</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&family=Press+Start+2P&family=Poppins:wght@400;700&display=swap" rel="stylesheet">
+
+<style>
+body {
+    margin: 0;
+    font-family: 'Montserrat', sans-serif;
+    display: flex;
+    height: 100vh;
+    background: #0f0f0f;
+    overflow: hidden;
+}
+
+/* BOTÓN FLOTANTE */
+.toggle-btn {
+    position: fixed;
+    top: 15px;
+    left: 15px;
+    z-index: 20;
+    background: rgba(0,0,0,0.6);
+    backdrop-filter: blur(10px);
+    color: white;
+    border: none;
+    padding: 10px 12px;
+    border-radius: 10px;
+    font-size: 16px;
+}
+
+/* PANEL */
+.controls {
+    width: 300px;
+    background: #181818;
+    color: white;
+    padding: 20px;
+    overflow-y: auto;
+    position: absolute;
+    height: 100%;
+    z-index: 15;
+    transform: translateX(0);
+    transition: transform 0.3s ease;
+}
+
+/* OCULTO */
+.controls.hidden {
+    transform: translateX(-100%);
+}
+
+/* MOBILE */
+@media (max-width: 768px) {
+    .controls {
+        width: 80%;
+    }
+}
+
+/* CARDS */
+.card {
+    background: #222;
+    padding: 12px;
+    border-radius: 10px;
+    margin-bottom: 12px;
+}
+
+label {
+    font-size: 12px;
+    opacity: 0.7;
+}
+
+textarea {
+    width: 100%;
+    height: 100px;
+    background: #111;
+    color: white;
+    border: none;
+    padding: 8px;
+    border-radius: 8px;
+}
+
+input, select {
+    width: 100%;
+    margin: 5px 0 10px;
+    padding: 8px;
+    border: none;
+    border-radius: 8px;
+    background: #111;
+    color: white;
+}
+
+/* BOTONES */
+button {
+    width: 100%;
+    padding: 10px;
+    border-radius: 10px;
+    border: none;
+}
+
+.play-btn {
+    background: #444;
+    color: white;
+}
+
+.download-btn {
+    background: #2a2a2a;
+    color: white;
+}
+
+/* DISPLAY FULL */
+.display {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: #bfbfb2;
+    width: 100%;
+    height: 100%;
+}
+
+/* LYRICS */
+.lyrics {
+    width: 80%;
+}
+
+.line {
+    font-size: 30px;
+    margin: 15px 0;
+    opacity: 0.4;
+    transition: all 0.4s;
+}
+
+.active {
+    opacity: 1;
+    transform: scale(1.05);
+    font-weight: bold;
+}
+
+.word {
+    opacity: 0.3;
+}
+
+.word.active-word {
+    opacity: 1;
+}
+</style>
+</head>
+
+<body>
+
+<button class="toggle-btn" onclick="togglePanel()">☰</button>
+
+<div class="controls hidden" id="panel">
+
+    <div class="card">
+        <label>Texto</label>
+        <textarea id="input"></textarea>
+    </div>
+
+    <div class="card">
+        <label>Tipografía</label>
+        <select id="fontSelect">
+            <option value="Montserrat">Montserrat</option>
+            <option value="Poppins">Poppins</option>
+            <option value="'Press Start 2P'">Arcade</option>
+        </select>
+
+        <label>Velocidad (1–10)</label>
+        <input type="number" id="speed" min="1" max="10" value="5">
+    </div>
+
+    <div class="card">
+        <label>Color activo</label>
+        <input type="color" id="activeColor" value="#000000">
+
+        <label>Color inactivo</label>
+        <input type="color" id="inactiveColor" value="#555555">
+
+        <label>Fondo</label>
+        <input type="color" id="bgColor" value="#bfbfb2">
+    </div>
+
+    <div class="card">
+        <button class="play-btn" onclick="start()">▶ Reproducir</button>
+        <button class="download-btn" onclick="exportVideo()">⬇ Descargar</button>
+    </div>
+
+</div>
+
+<div class="display" id="display">
+    <div class="lyrics" id="lyrics"></div>
+</div>
+
+<canvas id="canvas" width="720" height="1280" style="display:none;"></canvas>
+
+<script>
+let lines = [];
+let currentLine = 0;
+
+/* TOGGLE */
+function togglePanel() {
+    document.getElementById("panel").classList.toggle("hidden");
+}
+
+/* VELOCIDAD */
+function getSpeed() {
+    const val = parseInt(document.getElementById("speed").value) || 5;
+    return {
+        word: 400 - (val * 30),
+        line: 2000 - (val * 120)
+    };
+}
+
+/* START */
+function start() {
+    const text = document.getElementById("input").value;
+    lines = text.split("\n");
+
+    const container = document.getElementById("lyrics");
+    container.innerHTML = "";
+
+    lines.forEach(line => {
+        const div = document.createElement("div");
+        div.className = "line";
+
+        line.split(" ").forEach(word => {
+            const span = document.createElement("span");
+            span.className = "word";
+            span.innerText = word + " ";
+            div.appendChild(span);
+        });
+
+        container.appendChild(div);
+    });
+
+    applyStyles();
+    currentLine = 0;
+    playLine();
+}
+
+/* ESTILOS */
+function applyStyles() {
+    const font = document.getElementById("fontSelect").value;
+    const activeColor = document.getElementById("activeColor").value;
+    const inactiveColor = document.getElementById("inactiveColor").value;
+    const bgColor = document.getElementById("bgColor").value;
+
+    document.body.style.fontFamily = font;
+    document.getElementById("display").style.background =
+        `linear-gradient(${bgColor}, #999)`;
+
+    document.querySelectorAll(".line").forEach(line => {
+        line.style.color = inactiveColor;
+    });
+
+    document.querySelectorAll(".active").forEach(line => {
+        line.style.color = activeColor;
+    });
+}
+
+/* ANIMACIÓN */
+function playLine() {
+    const all = document.querySelectorAll(".line");
+
+    if (currentLine > 0) {
+        all[currentLine - 1].classList.remove("active");
+    }
+
+    if (currentLine < all.length) {
+        const line = all[currentLine];
+        line.classList.add("active");
+
+        applyStyles();
+
+        line.scrollIntoView({
+            behavior: "smooth",
+            block: "center"
+        });
+
+        animateWords(line, () => {
+            currentLine++;
+            playLine();
+        });
+    }
+}
+
+function animateWords(line, callback) {
+    const words = line.querySelectorAll(".word");
+    let i = 0;
+    const speed = getSpeed();
+
+    function next() {
+        if (i > 0) words[i - 1].classList.remove("active-word");
+
+        if (i < words.length) {
+            words[i].classList.add("active-word");
+            i++;
+            setTimeout(next, speed.word);
+        } else {
+            setTimeout(callback, speed.line / 2);
+        }
+    }
+
+    next();
+}
+
+/* VIDEO */
+async function exportVideo() {
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
+
+    const stream = canvas.captureStream(30);
+    const recorder = new MediaRecorder(stream);
+
+    let chunks = [];
+    recorder.ondataavailable = e => chunks.push(e.data);
+
+    recorder.onstop = () => {
+        const blob = new Blob(chunks, { type: "video/webm" });
+        const url = URL.createObjectURL(blob);
+
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "lyrics.webm";
+        a.click();
+    };
+
+    recorder.start();
+
+    let i = 0;
+    const speed = getSpeed();
+
+    const bgColor = document.getElementById("bgColor").value;
+    const activeColor = document.getElementById("activeColor").value;
+    const font = document.getElementById("fontSelect").value;
+
+    function draw() {
+        if (i >= lines.length) {
+            recorder.stop();
+            return;
+        }
+
+        ctx.fillStyle = bgColor;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        ctx.fillStyle = activeColor;
+        ctx.font = "bold 48px " + font;
+        ctx.textAlign = "center";
+
+        ctx.fillText(lines[i], canvas.width / 2, canvas.height / 2);
+
+        i++;
+        setTimeout(draw, speed.line);
+    }
+
+    draw();
+}
+</script>
+
+</body>
+</html>
